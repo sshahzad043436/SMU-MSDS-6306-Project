@@ -1,0 +1,154 @@
+---
+title: "BTobin-Unit-8-9-Scratch"
+author: "Brian Tobin"
+date: "October 9, 2019"
+output: 
+  revealjs::revealjs_presentation:
+    theme: league
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_knit$set(root.dir = "C:/Users/btobin/Documents/MDS-6306-Doing-Data-Science-Fall-2019/Unit 8 and 9 Case Study 1")
+#knitr::include_graphics("C:/Users/btobin/Documents/MDS-6306-Doing-Data-Science-Fall-2019/Unit 8 and 9 Case Study 1/Bud.PNG")
+```
+
+## R Markdown
+
+```{r library}
+library(png)
+library(dplyr)
+library(stringr)
+library(ggplot2)
+library(e1071)
+library(caret)
+```
+
+```{r directory}
+getwd()
+list.files()
+```
+
+# Budweiser Presentation
+![]("/Users/btobin/Documents/MDS-6306-Doing-Data-Science-Fall-2019/Unit 8 and 9 Case Study 1/Bud.PNG")
+
+#```{r Intro}
+#include_graphics("/Users/btobin/Documents/MDS-6306-Doing-Data-Science-Fall-2019/Unit 8 and 9 Case Study 1/Bud.PNG")
+
+#```
+
+## The Data
+```{r merge_data}
+# Reading in CSV data sets
+Beer <- read.csv(file = "Beers.csv",header=TRUE, sep=",",stringsAsFactors=FALSE)
+Brew <- read.csv(file= "Breweries.csv", header=TRUE, sep=",", stringsAsFactors=FALSE)
+Beer
+Brew
+```
+
+## Rename for merging
+
+```{r renaming Columns}
+# Next we rename  the brewery IDs, and merge the data
+beer <- Beer %>% rename(Brewery_ID=Brewery_id)
+brewery <- Brew %>% rename(Brewery_ID=Brew_ID)
+head(beer)
+head(brewery)
+```
+
+```{r Merging Files}
+beer <- beer %>% select(Name,Beer_ID,ABV,IBU,Style,Ounces,Brewery_ID)
+df <- merge(beer,brewery, by='Brewery_ID')
+head(df)
+```
+
+```{r Clean Up Columns}
+# Reordering the columns and give ourselves human readable names
+df <- df %>% 
+	rename(Beer_Name = Name.x) %>% 
+	rename(Brewery_Name = Name.y)
+nbd <- df %>% 
+	select(Beer_Name,Beer_ID,ABV,IBU,Style,Ounces,Brewery_Name,Brewery_ID,City,State)
+nbd
+```
+```{r remove missing values}
+summary(nbd)
+head(is.na(nbd))
+
+nbd[is.na(nbd)] <- 0
+summary(nbd)
+
+head(is.na(nbd))
+summary(nbd)
+```
+
+
+```{r median ABV and IBU by state}
+
+MaxByState <- as.data.frame(nbd 
+							  %>% group_by(State) 
+							  %>% summarise(maxABV = median(ABV, na.rm=TRUE),
+							  			  maxIBU = median(IBU, na.rm=TRUE),
+							  			  NumBreweries = n_distinct(Brewery_ID)))
+head(MaxByState)
+```
+
+```{r highest ABV}
+max(MaxByState$maxABV, na.rm=T)
+```
+
+```{r highest ABV}
+max(MaxByState$maxIBU, na.rm=T)
+```
+
+```{r Breweries by state}
+
+
+MaxByState <- as.data.frame(nbd 
+							  %>% group_by(State) 
+							  %>% summarise(NumBreweries = n_distinct(Brewery_ID)))
+head(MaxByState)
+```
+
+```{r data for scatterplot ABV and IBU}
+bplot <- nbd[,c('ABV','IBU')]
+print(head(bplot))
+```
+
+```{r scatterplot ABV and IBU}
+ggplot(bplot, aes(x = nbd$ABV, y = nbd$IBU)) +
+    geom_point() +
+      stat_smooth(method = "lm",
+        col = "#C42126",
+        se = FALSE,
+        size = 1) 
+```
+
+
+
+```{r get Beer_ID data}
+nbd$Beer_ID <- factor(nbd$Beer_ID)
+
+num.vars <- sapply(nbd, is.numeric)
+nbd[num.vars] <- lapply(nbd[num.vars], scale)
+
+myvars <- c("IBU","ABV")
+nbd.subset <- nbd[myvars]
+
+summary(nbd.subset)
+
+```
+
+```{r Counts Beers Per State}
+counts <- nbd %>%
+  group_by(State) %>%
+  summarise(counts = n())
+counts
+```
+
+
+
+
+
+
+

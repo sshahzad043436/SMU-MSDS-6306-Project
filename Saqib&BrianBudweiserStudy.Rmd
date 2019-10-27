@@ -1,0 +1,513 @@
+---
+title: "Budweiser IPA Study"
+author: "Saqib Shahzad & Brian Tobin"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = F, error = F, message = F,
+                      comment = " ", results = "markup", 
+                      fig.width = 9, fig.height = 5, fig.align = "center")
+```
+
+
+```{r, message=FALSE}
+#import libraries
+library(kableExtra)
+library(tidyverse)
+library(magrittr)
+library(readxl)
+library(ggpmisc)
+library(class)
+library(caret)
+
+#Set the working directory
+setwd("C:/Users/btobin/Documents/MDS-6306-Doing-Data-Science-Fall-2019/Unit 8 and 9 Case Study 1")
+
+#Fix the ggplot theme 
+theme_set(theme_bw())
+```
+
+
+## Question 1
+
+
+>How many breweries are present in each state?
+
+
+
+
+```{r}
+Beers = read_excel("C:/Users/btobin/Documents/MDS-6306-Doing-Data-Science-Fall-2019/Unit 8 and 9 Case Study 1/Beers.xlsx", sheet = 2)
+
+Beers %>% 
+  dplyr::count(State) %>% 
+  mutate(Pct = 100*n/sum(n)) %>%
+  rename(Count = n) %>%
+  arrange(Count) -> q1
+
+kable(q1, format = "html", align = "lcc", digits = 2) %>%
+  kableExtra::kable_styling(full_width = F)
+
+ggplot(q1, aes(reorder(State, -Count), Count, fill = State)) +
+  geom_bar(stat = "identity", position = position_dodge2(0.9)) +
+  scale_fill_viridis_d() +
+  labs(x="State") +
+  theme(legend.position = "none", axis.text.x = element_text(size = 9))
+  
+```
+
+
+## Question 2
+
+
+>Merge beer data with the breweries data. Print the first 6 observations and the last six observations to check the merged file. (RMD only, this does not need to be included in the presentation or the deck.)
+
+## Question 2 Answer
+Colorado has the highest number of breweries(47). The Brewery Wynkoop has the highest ABV, while 10 Barrel Brewing Company(.08) has the lowest(.05).
+
+
+```{r}
+Breweries = read_excel("C:/Users/btobin/Documents/MDS-6306-Doing-Data-Science-Fall-2019/Unit 8 and 9 Case Study 1/Beers.xlsx", sheet = 1)
+
+q2 = 
+  left_join(Breweries, Beers, by = c("Brewery_id" = "Brew_ID")) %>%
+  rename(Beers=Name.x, Breweries=Name.y) %>%
+  select(Beer_ID, Beers, Brewery_id, Breweries, everything())
+
+
+head(q2, 6) %>%
+  kable(format="html", align="clclcclcll", digits=2, caption="First six") %>%
+  kable_styling(full_width = F)
+
+tail(q2, 6) %>%
+  kable(format="html", align="clclcclcll", digits=2, caption="Last six") %>%
+  kable_styling(full_width = F)
+```
+
+
+## Question 3
+
+
+>Address the missing values in each column.
+
+IBU had 1005(42%) missing values and ABV had 62(3%) missing values. This reduces the overall power of the model. All other variables had complete values. 
+
+
+```{r}
+map_dbl(q2, ~is.na(.) %>% sum()) %>% 
+  enframe(name = "Variable", value = "# Missing") %>%
+  arrange(-`# Missing`) %>%
+  kable(format="html", align="lc") %>%
+  kable_styling(full_width = F)
+```
+
+
+## Question 4
+
+
+>Compute the median alcohol content and international bitterness unit for each state. Plot a bar chart to compare.
+
+There is no significant difference in reagrds to ABV per state. The state Maine(ME) has the highest median for IBU(61) and Distric of Columbia(DC) and Kentucky(KY) had the highest median ABV of 0.06.
+
+
+```{r}
+q4 = 
+  q2 %>%
+  group_by(State) %>%
+  summarise(
+    median_abv = median(ABV, na.rm = T), 
+    median_ibu = median(IBU, na.rm = T)
+    )
+
+q4 %>%
+  kable(format="html", align="lcc", digits=2, 
+        col.names=c("State", "Median ABV", "Median IBU")) %>%
+  kable_styling(full_width = F)
+
+q4 %>%
+  gather(key = "key", value = "value", -State) %>%
+  ggplot(aes(State, value, fill=State)) +
+  geom_bar(stat = "identity", position = position_dodge2(0.9)) +
+  scale_fill_viridis_d() +
+  facet_wrap(~key, scales = "free_y", ncol = 1,
+             labeller = 
+               labeller(key= c(median_abv='Median Alcohol Content', 
+                          median_ibu="Median International Bitterness"))) +
+  theme(legend.position = "none", axis.text.x = element_text(size=8)) 
+```
+
+
+## Question 5
+
+
+>Which state has the maximum alcoholic (ABV) beer? Which state has the most bitter (IBU) beer?
+
+## Question 5 Answer
+
+THe maximum ABV is Colorado with (0.128) and for `IBU` Oregon with (138).
+
+
+```{r}
+q4 %>% 
+  filter(median_abv == max(median_abv, na.rm = T)) %>% 
+  select(-median_ibu) %>%
+  kable(format="html", align="lc", digits=2, 
+        col.names=c("State", "Median ABV")) %>%
+  kable_styling(full_width = F)
+
+q4 %>% 
+  filter(median_ibu == max(median_ibu, na.rm = T))  %>% 
+  select(-median_abv) %>%
+  kable(format="html", align="lc", digits=2, 
+        col.names=c("State", "Median IBU")) %>%
+  kable_styling(full_width = F)
+```
+
+
+## Question 6
+
+
+> Comment on the summary statistics and distribution of the ABV variable.
+
+## Question 6 Answer
+
+THe data is right-skewed showing from .04 to .07 has the highest density. The table shows median range split of 50/50. The first quartile show 25% less and 75% high while the third quartile shows 75% less and 25% high. 
+
+
+```{r}
+tibble(
+  Stats = summary(q2$ABV) %>% names(),
+  Values = summary(q2$ABV) %>% as.vector()
+  ) %>%
+  kable(format="html", align="lc", digits=3) %>%
+  kable_styling(full_width = F)
+
+
+q2 %>% 
+  ggplot(aes(ABV, ..density..)) +
+  geom_histogram(fill="white", color="darkred", bins = 25) +
+  geom_density(color="navy", size=0.5, kernel = "epanechnikov") 
+```
+
+
+## Question 7
+
+
+> Is there an apparent relationship between the bitterness of the beer and its alcoholic content? Draw a scatter plot.  Make your best judgment of a relationship and EXPLAIN your answer.
+
+## Question 7 Answer 
+
+There is definitive positive causual relationship between the ABV and IBU. As the alchocol increases, so does the bitterness. Below is the scatterplot showing the result. As the slope equation illustrates, for one unit increase in IBU value, the ABV will increase by 0.000351. IBU explains 45% of the total variability of ABV.
+
+
+```{r}
+formula <- as.formula(y ~ x)
+q2 %>%
+  ggplot(aes(IBU, ABV)) +
+  geom_point(color="blue", alpha=0.3) +
+  geom_smooth(formula = formula, method = "lm", color="darkred") +
+  stat_poly_eq(aes(label = paste(..eq.label.., ..rr.label.., sep = "~~~")), 
+                   formula = formula, parse = TRUE, na.rm = T) 
+
+lm(ABV ~ IBU, data = q2) %>% summary() %$%
+  coefficients %>%
+  kable(format="html", align="lc", digits=4, row.names=T) %>%
+  kable_styling(full_width = F)
+```
+
+
+## Question 8
+
+
+>Budweiser would also like to investigate the difference with respect to IBU and ABV between IPAs (India Pale Ales) and other types of Ale (any beer with Ale in its name other than IPA).  You decide to use KNN classification to investigate this relationship.  Provide statistical evidence one way or the other. You can of course assume your audience is comfortable with percentages... KNN is very easy to understand conceptually.
+
+## Question 8 Answer 
+
+There is twice as much Ale as compared to IPA beer types. Below is various metrics showing the results.
+
+
+
+
+### Create the outcome 
+
+
+```{r}
+q8 = 
+  q2 %>%
+  mutate(
+    beer_type = 
+      ifelse(
+        str_to_lower(Beers) %>% str_detect("ipa"), "IPAs", 
+        ifelse(
+          str_to_lower(Beers) %>% str_detect("ale"), "Ale", NA
+          )
+        ) %>%
+      as.factor()
+    ) 
+
+q8 %>%
+  dplyr::count(beer_type) %>% 
+  na.omit() %>%
+  mutate(Pct = 100*n/sum(n)) %>%
+  rename(Count = n, `Beer Type`=beer_type, Percent=Pct) %>%
+  arrange(Count) %>%
+  kable(format="html", align="lcc", digits=2, row.names=F) %>%
+  kable_styling(full_width = F)
+```
+
+
+### KNN without transformation
+
+
+```{r}
+q8_v2 = 
+  q8 %>%
+  select(beer_type, ABV, IBU) %>%
+  na.omit() #knn function does not accept missing values
+
+#Select train and test datasets 
+r = nrow(q8_v2)
+p = 0.8 
+n = as.integer(p*r)
+set.seed(198)
+iterations = 100
+ks = 25
+accuracies = matrix(nrow = iterations, ncol = ks)
+set.seed(189)
+myseeds = runif(iterations) %>% multiply_by(1000) %>% round()
+
+for(j in 1:iterations)
+{
+  set.seed(myseeds[j])
+  index = sample(1:r, n, replace = F)
+  test.data = q8_v2[index,] 
+  train.data = q8_v2[-index,]
+  for(i in 1:ks)
+  {
+    knn(
+      train = train.data %>% select(ABV, IBU), 
+      test = test.data %>% select(ABV, IBU), 
+      cl = train.data %$% beer_type, 
+      k = i, prob = F
+      ) -> knn_v0
+    confMat = confusionMatrix(table(knn_v0, test.data$beer_type))
+    accuracies[j,i] = confMat$overall[1]
+  }
+  #cat(j, "\n")
+}
+
+plot(1:ks, colMeans(accuracies), type = "b", lwd=1, pch=19, col="navy", 
+     xlab = "Number of neighbours", ylab = "Accuracy")
+abline(v = 13, col="red")
+abline(h = colMeans(accuracies)[13], col="red")
+
+avg_acc = colMeans(accuracies)[13]
+```
+
+>The most optimal number of neighbours is **13**
+
+$$Average\,Accuracy = `r scales::percent(avg_acc)`$$
+
+### KNN with transformation and normalization
+
+The model performance decrease significantly after transformation!!!
+
+```{r}
+q8_v3 = 
+  q8_v2 %>%
+  mutate(
+    ABV = log(ABV+1) %>% scale() %>% as.numeric(), 
+    IBU = log(IBU) %>% scale() %>% as.numeric()
+    )
+
+#Select train and test datasets 
+r = nrow(q8_v3)
+p = 0.8 
+n = as.integer(p*r)
+set.seed(198)
+iterations = 100
+accuracies = matrix(nrow = iterations, ncol = ks)
+ks = 25
+set.seed(189)
+myseeds = runif(iterations) %>% multiply_by(1000) %>% round()
+
+for(j in 1:iterations)
+{
+  set.seed(myseeds[j])
+  index = sample(1:r, n, replace = F)
+  test.data = q8_v3[index,] 
+  train.data = q8_v3[-index,]
+  for(i in 1:ks)
+  {
+    knn(
+      train = train.data %>% select(ABV, IBU), 
+      test = test.data %>% select(ABV, IBU), 
+      cl = train.data %$% beer_type, 
+      k = i, prob = F
+      ) -> knn_v0
+    confMat = confusionMatrix(table(knn_v0, test.data$beer_type))
+    accuracies[j,i] = confMat$overall[1]
+  }
+  #cat(j, "\n")
+}
+
+plot(1:ks, colMeans(accuracies), type = "b", lwd=1, pch=19, col="navy", 
+     xlab = "Number of neighbours", ylab = "Accuracy")
+abline(v = 5, col="red")
+abline(h = colMeans(accuracies)[5], col="red")
+
+avg_acc = colMeans(accuracies)[5]
+```
+
+>The most optimal number of neighbours is **5**
+
+$$Overall\,Accuracy = `r scales::percent(avg_acc)`$$
+
+### Alternative: Logistic Regression (without transformation)
+
+
+We find the approximately the same accuarcy.
+
+
+```{r}
+q8_v2 = 
+  q8 %>%
+  select(beer_type, ABV, IBU) %>%
+  na.omit()
+
+#Select train and test datasets 
+r = nrow(q8_v2)
+p = 0.8 
+n = as.integer(p*r)
+iterations = 100
+accuracies = numeric(iterations)
+set.seed(189)
+myseeds = runif(iterations) %>% multiply_by(1000) %>% round()
+
+for(i in 1:iterations)
+{
+  set.seed(myseeds[i])
+  index = sample(1:r, n, replace = F)
+  test.data = q8_v2[index,] 
+  train.data = q8_v2[-index,]
+    glm(
+      formula = beer_type ~ ABV + IBU, 
+      data = q8_v2, 
+      family = binomial("logit") # logit, probit, cauchit
+      ) -> glm_v0
+    predicted = 
+      predict.glm(glm_v0, newdata = test.data, type = "response") %>%
+      as.numeric() %>%
+      is_weakly_greater_than(0.5) %>%
+      ifelse("IPAs", "Ale") %>%
+      as.factor()
+    confMat = confusionMatrix(table(predicted, test.data$beer_type))
+    accuracies[i] = confMat$overall[1]
+}
+
+avg_acc = mean(accuracies)
+```
+
+
+$$Overall\,Accuracy = `r scales::percent(avg_acc)`$$
+
+## Question 9
+
+
+```{r}
+us_region = 
+  tibble(
+    State = str_to_upper(state.abb),
+    Region = str_to_title(state.region)
+    ) 
+
+q9 = 
+  left_join(q8, us_region, by="State") %>%
+  select(beer_type, ABV, IBU, Ounces, Region) %>%
+  na.omit()
+```
+
+
+### Test the association between beer size (ounces variables) and beer type. 
+
+
+```{r}
+#t.test(Ounces ~ beer_type, data = q9, paired=F)
+wilcox.test(Ounces ~ beer_type, data = q9, paired=F)
+```
+
+
+### Test the association between beer region (ounces variables) and beer type. 
+
+
+```{r}
+count(q9, beer_type, Region) %>% 
+  group_by(beer_type) %>%
+  mutate(Pct = 100*n/sum(n)) %>%
+  rename(Count = n) %>%
+  arrange(beer_type, Region) %>% 
+  kable(format = "html", align = "llcc", digits = 2, 
+        col.names = c("Beer Type", "Region", "Count", "Percent")) %>%
+  kable_styling(full_width = F) %>%
+  collapse_rows(1)
+
+q9 %$% fisher.test(beer_type, Region)
+```
+
+
+### Logistic Regression (without transformation)
+
+We notice that the accuracy increase significantly after adding **regions** in the model. 
+
+
+```{r}
+q9_v2 = 
+  q9 %>%
+  select(beer_type, ABV, IBU, Region) %>%
+  na.omit()
+
+#Select train and test datasets 
+r = nrow(q9_v2)
+p = 0.8 
+n = as.integer(p*r)
+iterations = 100
+accuracies = numeric(iterations)
+set.seed(189)
+myseeds = runif(iterations) %>% multiply_by(1000) %>% round()
+
+for(i in 1:iterations)
+{
+  set.seed(myseeds[i])
+  index = sample(1:r, n, replace = F)
+  test.data = q9_v2[index,] 
+  train.data = q9_v2[-index,]
+    glm(
+      formula = beer_type ~ ABV + IBU + Region, 
+      data = q9_v2, 
+      family = binomial("logit") # logit, probit, cauchit
+      ) -> glm_v0
+    predicted = 
+      predict.glm(glm_v0, newdata = test.data, type = "response") %>%
+      as.numeric() %>%
+      is_weakly_greater_than(0.5) %>%
+      ifelse("IPAs", "Ale") %>%
+      as.factor()
+    confMat = confusionMatrix(table(predicted, test.data$beer_type))
+    accuracies[i] = confMat$overall[1]
+}
+
+avg_acc = mean(accuracies)
+```
+
+
+$$Overall\,Accuracy = `r scales::percent(avg_acc)`$$
+
+#Conclusion
+
+The study was using beer data from across the 48 Contiguous states and the various breweries that create Ale and IPA beers. By using this data we are able to determine the possible taste, best market penetration, and which beers would be a best fit per region and state. Fidings show that the North Central would have the best potential for Budweiser Ale penetraion where as the west coast be best for both ALE and IPAs. THe Northeast and South have the least marketshare for Ale and IPAs and would not be a good suggestion for high volume sales.
+
+
+
+
+
